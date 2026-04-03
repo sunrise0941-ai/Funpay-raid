@@ -3,7 +3,7 @@ import time
 from bs4 import BeautifulSoup
 import telebot
 
-TOKEN = "ТВОЙ_ТОКЕН"
+TOKEN = "8715875001:AAFIkVElPoF_Ge07raX_XdqNFT4916DDwYY"
 bot = telebot.TeleBot(TOKEN)
 
 URL = "https://funpay.com/lots/566/"
