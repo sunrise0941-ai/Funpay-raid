@@ -18,7 +18,7 @@ def get_alert(title):
     t = title.lower()
 
     has_hekaton = any(h in t for h in ["гекатон", "гек", "hekaton", "hek"])
-    has_solanar = any(s in t for s in ["соланар", "solanar", "сол"])
+    has_solanar = any(s in t for s in ["соланар", "solanar"])
     has_combo = any(c in t for c in ["связка", "комба", "combo", "bundle"])
 
     if has_combo:
