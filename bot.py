@@ -36,7 +36,7 @@ def check():
 
     lots = soup.find_all("a", class_="tc-item")
 
-for lot in lots[:60]:
+    for lot in lots[:60]:
     # название (чистое)
     title_tag = lot.find("div", class_="tc-desc-text")
     title = title_tag.text.strip() if title_tag else "Без названия"
