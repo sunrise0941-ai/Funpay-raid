@@ -36,44 +36,51 @@ def check():
 
     lots = soup.find_all("a", class_="tc-item")
 
-    for lot in lots[:60]:
-        title = lot.text.strip()
-        title_lower = title.lower()
-        
+for lot in lots[:60]:
+    # название (чистое)
+    title_tag = lot.find("div", class_="tc-desc-text")
+    title = title_tag.text.strip() if title_tag else "Без названия"
+    title_lower = title.lower()
+
+    # ссылка (фикс дублирования)
     href = lot.get("href")
     if href.startswith("http"):
         link = href
     else:
         link = "https://funpay.com" + href
 
-        price_tag = lot.find("div", class_="tc-price")
-        if not price_tag:
-            continue
+    # цена
+    price_tag = lot.find("div", class_="tc-price")
+    if not price_tag:
+        continue
 
-        price_text = price_tag.text.strip()
-        price_value = parse_price(price_text)
+    price_text = price_tag.text.strip()
+    price_value = parse_price(price_text)
 
-        alert = get_alert(title_lower)
+    # фильтр
+    alert = get_alert(title_lower)
 
-        if not alert:
-            continue
+    if not alert:
+        continue
 
-        if price_value > 5000:
-            continue
+    if price_value > 5000:
+        continue
 
-        if price_value <= 2500:
-            alert = "🚨 СУПЕР ДЁШЕВО!"
+    if price_value <= 2500:
+        alert = "🚨 СУПЕР ДЁШЕВО!"
 
-        if link not in seen:
-            seen.add(link)
+    # анти-дубликат
+    if link not in seen:
+        seen.add(link)
 
-            bot.send_message(
-                CHAT_ID,
-                f"{alert}\n\n"
-                f"📌 {title}\n"
-                f"💰 {price_text}\n"
-                f"🔗 {link}"
-            )
+        bot.send_message(
+            CHAT_ID,
+            f"{alert}\n\n"
+            f"📌 {title}\n"
+            f"💰 {price_text}\n"
+            f"🔗 {link}",
+            disable_web_page_preview=True
+        )   
 
 CHAT_ID = None
 
