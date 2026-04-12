@@ -3,7 +3,6 @@ import json
 import random
 import time
 import logging
-import threading
 import requests
 from bs4 import BeautifulSoup
 import telebot
@@ -12,18 +11,19 @@ import telebot
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 if not TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN не задан")
+    raise ValueError("Нет TELEGRAM_BOT_TOKEN")
 
 URL = "https://funpay.com/lots/566/"
 CHECK_INTERVAL_MIN = 25
 CHECK_INTERVAL_MAX = 35
 
 MAX_PRICE = 5000
-SUPER_CHEAP_THRESHOLD = 2500
-MAX_LOTS_TO_SCAN = 60
+SUPER_CHEAP = 2500
+MAX_LOTS = 60
+
 SEEN_FILE = "seen.json"
 
-# ---------- LOGGING ----------
+# ---------- LOG ----------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -32,16 +32,7 @@ bot = telebot.TeleBot(TOKEN)
 seen = set()
 chat_ids = set()
 
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-    "Mozilla/5.0 (X11; Linux x86_64)",
-]
-
-def get_headers():
-    return {"User-Agent": random.choice(USER_AGENTS)}
-
-# ---------- LOAD/SAVE ----------
+# ---------- LOAD ----------
 def load_seen():
     global seen
     try:
@@ -54,16 +45,16 @@ def save_seen():
     with open(SEEN_FILE, "w") as f:
         json.dump(list(seen), f)
 
-# ---------- PARSE PRICE ----------
+# ---------- PRICE ----------
 def parse_price(text):
     digits = "".join(filter(str.isdigit, text))
     return int(digits) if digits else None
 
-# ---------- ALERT FILTER ----------
-def get_alert_type(title):
+# ---------- ALERTS ----------
+def get_alert(title):
     t = title.lower()
 
-    if any(w in t for w in ["связка", "combo", "bundle"]):
+    if "связка" in t or "combo" in t:
         return "🚨 СВЯЗКА"
     if "гекатон" in t:
         return "🔥 ГЕКАТОН"
@@ -73,17 +64,17 @@ def get_alert_type(title):
         return "🌸 САБРАЭЛЬ"
     return None
 
-# ---------- MAIN CHECK ----------
-def check_lots():
+# ---------- CHECK ----------
+def check():
     try:
-        time.sleep(random.uniform(1, 3))
+        time.sleep(random.uniform(1, 2))
 
-        r = requests.get(URL, headers=get_headers(), timeout=15)
+        r = requests.get(URL, timeout=15)
         soup = BeautifulSoup(r.text, "html.parser")
 
         lots = soup.find_all("a", class_="tc-item")
 
-        for lot in lots[:MAX_LOTS_TO_SCAN]:
+        for lot in lots[:MAX_LOTS]:
 
             title_tag = lot.find("div", class_="tc-desc-text")
             price_tag = lot.find("div", class_="tc-price")
@@ -104,7 +95,7 @@ def check_lots():
             if not link.startswith("http"):
                 link = "https://funpay.com" + link
 
-            alert = get_alert_type(title)
+            alert = get_alert(title)
             if not alert:
                 continue
 
@@ -116,7 +107,7 @@ def check_lots():
 
             seen.add(link)
 
-            if price <= SUPER_CHEAP_THRESHOLD:
+            if price <= SUPER_CHEAP:
                 alert = "🚨 СУПЕР ДЁШЕВО! " + alert
 
             msg = f"{alert}\n\n{title}\n💰 {price}\n🔗 {link}"
@@ -132,10 +123,10 @@ def check_lots():
     except Exception as e:
         logger.error(e)
 
-# ---------- BACKGROUND LOOP ----------
+# ---------- LOOP ----------
 def loop():
     while True:
-        check_lots()
+        check()
         time.sleep(random.uniform(CHECK_INTERVAL_MIN, CHECK_INTERVAL_MAX))
 
 # ---------- TELEGRAM ----------
@@ -147,26 +138,13 @@ def start(m):
 @bot.message_handler(commands=["stop"])
 def stop(m):
     chat_ids.discard(m.chat.id)
-    bot.reply_to(m, "Остановлено 🛑")
+    bot.reply_to(m, "Остановлен 🛑")
 
-# ---------- PING SERVER (ANTI SLEEP) ----------
-def keep_alive():
-    url = os.getenv("RENDER_EXTERNAL_URL")
-    if not url:
-        return
-
-    while True:
-        try:
-            requests.get(url)
-        except:
-            pass
-        time.sleep(300)  # каждые 5 минут
-
-# ---------- START ----------
+# ---------- MAIN ----------
 if __name__ == "__main__":
     load_seen()
 
+    import threading
     threading.Thread(target=loop, daemon=True).start()
-    threading.Thread(target=keep_alive, daemon=True).start()
 
     bot.polling(none_stop=True)
