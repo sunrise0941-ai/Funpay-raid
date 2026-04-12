@@ -80,8 +80,6 @@ def check():
                 f"{alert}\n\n"
                 f"📌 {title}\n"
                 f"💰 {price_text}\n"
-                f"🔗 {link}",
-                disable_web_page_preview=True
             )
 
 CHAT_ID = None
