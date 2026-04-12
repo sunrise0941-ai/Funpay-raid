@@ -39,8 +39,8 @@ def check():
     for lot in lots[:60]:
         title = lot.text.strip()
         title_lower = title.lower()
-        href = lot.get("href")
-
+        
+    href = lot.get("href")
     if href.startswith("http"):
         link = href
     else:
