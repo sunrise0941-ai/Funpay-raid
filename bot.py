@@ -31,7 +31,11 @@ def get_alert(title):
         return None
 
 def check():
-    r = requests.get(URL)
+    headers = {
+    "User-Agent": "Mozilla/5.0"
+    }
+
+    r = requests.get(URL, headers=headers)
     soup = BeautifulSoup(r.text, "html.parser")
 
     lots = soup.find_all("a", class_="tc-item")
