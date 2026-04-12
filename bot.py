@@ -99,12 +99,14 @@ def start(message):
         except:
             time.sleep(30)
 
+import time
+
 @bot.message_handler(commands=['check'])
 def check_status(message):
-    try:
-        check()  # запускаем проверку вручную
-        bot.send_message(message.chat.id, "✅ Проверка выполнена")
-    except Exception as e:
-        bot.send_message(message.chat.id, f"❌ Ошибка: {e}")
+    check()
+    bot.send_message(
+        message.chat.id,
+        f"✅ Бот работает\n⏱ {time.strftime('%H:%M:%S')}"
+    )
 
 bot.polling()
