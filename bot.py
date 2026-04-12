@@ -36,7 +36,7 @@ def check():
 
     lots = soup.find_all("a", class_="tc-item")
 
-    for lot in lots[:30]:
+    for lot in lots[:60]:
         title = lot.text.strip()
         title_lower = title.lower()
         link = "https://funpay.com" + lot.get("href")
@@ -82,8 +82,8 @@ def start(message):
     while True:
         try:
             check()
-            time.sleep(60)
+            time.sleep(30)
         except:
-            time.sleep(60)
+            time.sleep(30)
 
 bot.polling()
