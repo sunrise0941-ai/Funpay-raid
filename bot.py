@@ -79,8 +79,6 @@ def check():
                 CHAT_ID,
                 f"{alert}\n\n"
                 f"📌 {title}\n"
-                f"👤 {seller}\n"
-                f"⭐ {feedback}\n"
                 f"💰 {price_text}\n"
                 f"🔗 {link}",
                 disable_web_page_preview=True
