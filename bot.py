@@ -32,7 +32,7 @@ def get_alert(title):
 
 def check():
     headers = {
-    "User-Agent": "Mozilla/5.0"
+        "User-Agent": "Mozilla/5.0"
     }
 
     r = requests.get(URL, headers=headers)
