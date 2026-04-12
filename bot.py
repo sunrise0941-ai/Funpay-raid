@@ -17,9 +17,10 @@ def parse_price(price_text):
 def get_alert(title):
     t = title.lower()
 
-    has_hekaton = any(h in t for h in ["гекатон", "гек", "hekaton", "hek"])
+    has_hekaton = any(h in t for h in ["гекатон", "гека", "hekaton"])
     has_solanar = any(s in t for s in ["соланар", "solanar"])
     has_combo = any(c in t for c in ["связка", "комба", "combo", "bundle"])
+    has_sabr = any(h in t for h in ["сабраэль", "сабр", "sabrael"])
 
     if has_combo:
         return "🚨 СВЯЗКА"
@@ -27,6 +28,8 @@ def get_alert(title):
         return "🔥 ГЕКАТОН"
     elif has_solanar:
         return "⭐ СОЛАНАР"
+    elif has_sabr:
+        return "🌸 САБРАЭЛЬ"
     else:
         return None
 
