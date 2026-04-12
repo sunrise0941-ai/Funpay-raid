@@ -20,7 +20,7 @@ def get_alert(title):
     has_hekaton = any(h in t for h in ["гекатон", "гека", "hekaton"])
     has_solanar = any(s in t for s in ["соланар", "solanar"])
     has_combo = any(c in t for c in ["связка", "комба", "combo", "bundle"])
-    has_sabr = any(h in t for s in ["сабраэль", "сабр", "sabrael"])
+    has_sabr = any(s in t for s in ["сабраэль", "сабр", "sabrael"])
 
     if has_combo:
         return "🚨 СВЯЗКА"
