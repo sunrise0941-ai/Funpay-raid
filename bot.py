@@ -39,7 +39,12 @@ def check():
     for lot in lots[:60]:
         title = lot.text.strip()
         title_lower = title.lower()
-        link = "https://funpay.com" + lot.get("href")
+        href = lot.get("href")
+
+    if href.startswith("http"):
+        link = href
+    else:
+        link = "https://funpay.com" + href
 
         price_tag = lot.find("div", class_="tc-price")
         if not price_tag:
