@@ -24,9 +24,14 @@ CHECK_INTERVAL_MAX = 35
 MAX_PRICE = 5000
 SUPER_CHEAP_THRESHOLD = 2500
 MAX_LOTS_TO_SCAN = 60
-SEEN_FILE = "seen_lots.json"
-CHATS_FILE = "chat_ids.json"          # НОВОЕ: файл для хранения подписок
-LOG_FILE = "bot.log"
+
+# ---------- ПУТИ К ФАЙЛАМ В VOLUME ----------
+DATA_DIR = "/app/data"
+os.makedirs(DATA_DIR, exist_ok=True)
+
+SEEN_FILE = os.path.join(DATA_DIR, "seen_lots.json")
+CHATS_FILE = os.path.join(DATA_DIR, "chat_ids.json")
+LOG_FILE = os.path.join(DATA_DIR, "bot.log")
 
 # ---------- ЛОГИРОВАНИЕ ----------
 logging.basicConfig(
@@ -74,7 +79,6 @@ def save_seen() -> None:
     except Exception as e:
         logger.error(f"Ошибка сохранения seen: {e}")
 
-# НОВОЕ: функции для работы с чатами
 def load_chats() -> Set[int]:
     try:
         with open(CHATS_FILE, 'r', encoding='utf-8') as f:
@@ -181,7 +185,7 @@ def check_lots() -> None:
                     logger.error(f"Ошибка отправки в чат {chat_id}: {e}")
                     if "bot was blocked" in str(e) or "chat not found" in str(e):
                         chat_ids.discard(chat_id)
-                        save_chats()          # НОВОЕ: сохраняем после удаления
+                        save_chats()
 
     except requests.exceptions.RequestException as e:
         logger.error(f"Ошибка сети при запросе к Funpay: {e}")
@@ -202,7 +206,7 @@ def worker() -> None:
 @bot.message_handler(commands=['start'])
 def start(message: telebot.types.Message) -> None:
     chat_ids.add(message.chat.id)
-    save_chats()                            # НОВОЕ: сохраняем подписку
+    save_chats()
     bot.reply_to(message, "🚀 Бот запущен и отслеживает лоты Funpay.\n"
                          "Ключевые слова: Гекатон, Соланар, Сабраэль, связки.\n"
                          "Максимальная цена: 5000₽\n"
@@ -212,7 +216,7 @@ def start(message: telebot.types.Message) -> None:
 @bot.message_handler(commands=['stop'])
 def stop(message: telebot.types.Message) -> None:
     chat_ids.discard(message.chat.id)
-    save_chats()                            # НОВОЕ: сохраняем отписку
+    save_chats()
     bot.reply_to(message, "🛑 Вы отключены от уведомлений")
 
 @bot.message_handler(commands=['check'])
@@ -235,7 +239,7 @@ signal.signal(signal.SIGTERM, signal_handler)
 if __name__ == "__main__":
     # Загружаем сохранённые данные
     seen = load_seen()
-    chat_ids = load_chats()                 # ИЗМЕНЕНО: загружаем чаты
+    chat_ids = load_chats()
     logger.info(f"Загружено {len(seen)} лотов, {len(chat_ids)} подписчиков")
 
     # Запускаем фоновый поток
