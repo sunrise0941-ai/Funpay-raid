@@ -19,12 +19,13 @@ if not TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN не задан в переменных окружения")
 
 URL = "https://funpay.com/lots/566/"
-CHECK_INTERVAL_MIN = 25   # минимальная задержка между проверками (сек)
-CHECK_INTERVAL_MAX = 35   # максимальная задержка
-MAX_PRICE = 5000          # максимальная цена лота для уведомления
-SUPER_CHEAP_THRESHOLD = 2500  # порог для пометки "супер дёшево"
-MAX_LOTS_TO_SCAN = 60     # сколько лотов проверять на странице
+CHECK_INTERVAL_MIN = 25
+CHECK_INTERVAL_MAX = 35
+MAX_PRICE = 5000
+SUPER_CHEAP_THRESHOLD = 2500
+MAX_LOTS_TO_SCAN = 60
 SEEN_FILE = "seen_lots.json"
+CHATS_FILE = "chat_ids.json"          # НОВОЕ: файл для хранения подписок
 LOG_FILE = "bot.log"
 
 # ---------- ЛОГИРОВАНИЕ ----------
@@ -40,13 +41,12 @@ logger = logging.getLogger(__name__)
 
 # ---------- БОТ ----------
 bot = telebot.TeleBot(TOKEN)
-# Ограничение на отправку сообщений (не более 20 в сек)
 apihelper.SEND_MESSAGE_RATE_LIMIT = 0.05
 
 # ---------- ГЛОБАЛЬНОЕ СОСТОЯНИЕ ----------
-seen: Set[str] = set()          # уже отправленные ссылки
-chat_ids: Set[int] = set()      # подписанные чаты
-stop_event = threading.Event()  # для graceful shutdown
+seen: Set[str] = set()
+chat_ids: Set[int] = set()
+stop_event = threading.Event()
 
 # ---------- РОТАЦИЯ USER-AGENT ----------
 USER_AGENTS = [
@@ -59,12 +59,11 @@ USER_AGENTS = [
 def get_headers() -> dict:
     return {"User-Agent": random.choice(USER_AGENTS)}
 
-# ---------- РАБОТА С ФАЙЛОМ SEEN ----------
+# ---------- РАБОТА С ФАЙЛАМИ ----------
 def load_seen() -> Set[str]:
     try:
         with open(SEEN_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            return set(data)
+            return set(json.load(f))
     except (FileNotFoundError, json.JSONDecodeError):
         return set()
 
@@ -75,9 +74,24 @@ def save_seen() -> None:
     except Exception as e:
         logger.error(f"Ошибка сохранения seen: {e}")
 
+# НОВОЕ: функции для работы с чатами
+def load_chats() -> Set[int]:
+    try:
+        with open(CHATS_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return set(data)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return set()
+
+def save_chats() -> None:
+    try:
+        with open(CHATS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(list(chat_ids), f, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Ошибка сохранения chat_ids: {e}")
+
 # ---------- ПАРСИНГ ЦЕНЫ ----------
 def parse_price(price_text: str) -> Optional[int]:
-    """Извлекает число из строки цены. Возвращает None при ошибке."""
     digits = ''.join(filter(str.isdigit, price_text))
     if not digits:
         return None
@@ -88,10 +102,7 @@ def parse_price(price_text: str) -> Optional[int]:
 
 # ---------- ФИЛЬТР ПО НАЗВАНИЮ ----------
 def get_alert_type(title: str) -> Optional[str]:
-    """Определяет тип алерта по ключевым словам."""
     t = title.lower()
-
-    # Приоритет: связка > конкретные герои
     if any(word in t for word in ["связка", "комба", "combo", "bundle"]):
         return "🚨 СВЯЗКА"
     elif any(word in t for word in ["гекатон", "гека", "hekaton"]):
@@ -104,10 +115,8 @@ def get_alert_type(title: str) -> Optional[str]:
 
 # ---------- ПРОВЕРКА ЛОТОВ ----------
 def check_lots() -> None:
-    """Основная логика: загрузка страницы, парсинг, отправка уведомлений."""
     try:
         headers = get_headers()
-        # Добавляем случайную задержку перед запросом (анти-бан)
         time.sleep(random.uniform(1, 3))
 
         response = requests.get(URL, headers=headers, timeout=15)
@@ -139,7 +148,6 @@ def check_lots() -> None:
             if not link.startswith("http"):
                 link = "https://funpay.com" + link
 
-            # Проверка фильтров
             alert_type = get_alert_type(title)
             if not alert_type:
                 continue
@@ -147,18 +155,16 @@ def check_lots() -> None:
             if price_value > MAX_PRICE:
                 continue
 
-            # Формируем окончательный заголовок
             if price_value <= SUPER_CHEAP_THRESHOLD:
                 alert = f"🚨 СУПЕР ДЁШЕВО! {alert_type}"
             else:
                 alert = alert_type
 
-            # Проверка, не отправляли ли уже
             if link in seen:
                 continue
 
             seen.add(link)
-            save_seen()  # сохраняем после каждого нового лота
+            save_seen()
 
             message = (
                 f"{alert}\n\n"
@@ -167,17 +173,15 @@ def check_lots() -> None:
                 f"🔗 {link}"
             )
 
-            # Рассылка всем подписанным чатам
             for chat_id in list(chat_ids):
                 try:
                     bot.send_message(chat_id, message)
-                    # Небольшая пауза, чтобы не упереться в лимиты Telegram
                     time.sleep(0.05)
                 except Exception as e:
                     logger.error(f"Ошибка отправки в чат {chat_id}: {e}")
-                    # Если чат заблокировал бота, удаляем из списка
                     if "bot was blocked" in str(e) or "chat not found" in str(e):
                         chat_ids.discard(chat_id)
+                        save_chats()          # НОВОЕ: сохраняем после удаления
 
     except requests.exceptions.RequestException as e:
         logger.error(f"Ошибка сети при запросе к Funpay: {e}")
@@ -186,13 +190,10 @@ def check_lots() -> None:
 
 # ---------- ФОНОВЫЙ ЦИКЛ ----------
 def worker() -> None:
-    """Бесконечный цикл проверки с контролируемой остановкой."""
     logger.info("Поток мониторинга запущен")
     while not stop_event.is_set():
         check_lots()
-        # Случайная задержка между итерациями
         delay = random.uniform(CHECK_INTERVAL_MIN, CHECK_INTERVAL_MAX)
-        # Используем Event.wait для возможности быстрой остановки
         if stop_event.wait(delay):
             break
     logger.info("Поток мониторинга остановлен")
@@ -201,6 +202,7 @@ def worker() -> None:
 @bot.message_handler(commands=['start'])
 def start(message: telebot.types.Message) -> None:
     chat_ids.add(message.chat.id)
+    save_chats()                            # НОВОЕ: сохраняем подписку
     bot.reply_to(message, "🚀 Бот запущен и отслеживает лоты Funpay.\n"
                          "Ключевые слова: Гекатон, Соланар, Сабраэль, связки.\n"
                          "Максимальная цена: 5000₽\n"
@@ -210,6 +212,7 @@ def start(message: telebot.types.Message) -> None:
 @bot.message_handler(commands=['stop'])
 def stop(message: telebot.types.Message) -> None:
     chat_ids.discard(message.chat.id)
+    save_chats()                            # НОВОЕ: сохраняем отписку
     bot.reply_to(message, "🛑 Вы отключены от уведомлений")
 
 @bot.message_handler(commands=['check'])
@@ -230,9 +233,10 @@ signal.signal(signal.SIGTERM, signal_handler)
 
 # ---------- ТОЧКА ВХОДА ----------
 if __name__ == "__main__":
-    # Загружаем сохранённые ссылки
+    # Загружаем сохранённые данные
     seen = load_seen()
-    logger.info(f"Загружено {len(seen)} просмотренных лотов")
+    chat_ids = load_chats()                 # ИЗМЕНЕНО: загружаем чаты
+    logger.info(f"Загружено {len(seen)} лотов, {len(chat_ids)} подписчиков")
 
     # Запускаем фоновый поток
     worker_thread = threading.Thread(target=worker, daemon=False)
